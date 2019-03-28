@@ -36,7 +36,7 @@ def beanstalk_address
   uri = URI.parse(beanstalk_url)
 
   if uri.scheme != 'beanstalk'
-    raise StandardError, "Bad URL: #{beanstalk_url}"
+    raise StandardError
   end
 
   "#{uri.host}:#{uri.port || 11300}"
@@ -47,25 +47,41 @@ def beanstalk
 end
 
 def jobs_hash
-  result = {}
+  result   = {}
+  warning  = {}
+  critical = {}
+
   beanstalk.tubes.each do |tube|
     jobs = tube.peek(:ready)
-    count = jobs.nil? ? '0' : jobs.length
-    result[tube.name] = count
+    next if jobs.nil?
+
+    critical[tube.name] = jobs.length if jobs.length > critical_max_jobs
+    warning[tube.name]  = jobs.length if jobs.length > warning_max_jobs
   end
+  result[:warning]  = warning
+  result[:critical] = critical
   result
+end
+
+def build_message(hsh, threshold)
+  tubes = hsh.map{ |k, v| "#{k} (#{v})" }.join(', ')
+  "#{hsh.length} tube(s) are over #{threshold} jobs: #{tubes}"
 end
 
 def run
   begin
-    if jobs_hash.values.any? { |v| v.to_i > critical_max_jobs }
+    if jobs_hash[:critical].values.any?
+      puts "CRITICAL: #{build_message(jobs_hash[:critical], critical_max_jobs)}"
       exit 2
-    elsif jobs_hash.values.any? { |v| v.to_i > warning_max_jobs }
+    elsif jobs_hash[:warning].values.any?
+      puts "WARNING: #{build_message(jobs_hash[:warning], warning_max_jobs)}"
       exit 1
     else
+      puts 'OK'
       exit 0
     end
   rescue StandardError
+    puts "Bad url: #{beanstalk_url} or beanstalkd unreachable"
     exit 3
   end
 end
