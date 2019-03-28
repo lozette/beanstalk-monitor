@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
+#
+#  Usage: ruby jobs.rb <url> <max_jobs>
+#  e.g. ruby jobs.rb beanstalk://127.0.0.1/ 25
 
 require 'beaneater'
 require 'uri'
@@ -7,20 +9,25 @@ require 'uri'
 MAX_JOBS = 25
 
 def beanstalk_url
-  return ARGV[0] if ARGV
+  return ARGV[0] if ARGV.any?
 
   'beanstalk://127.0.0.1/'
 end
 
 def max_jobs
-  return ARGV[1] if ARGV && ARGV[1].to_i.positive?
+  if ARGV && ARGV[1].to_i > 0
+    return ARGV[1].to_i
+  end
 
   MAX_JOBS
 end
 
 def beanstalk_address
   uri = URI.parse(beanstalk_url)
-  raise Error, "Bad URL: #{beanstalk_url}" unless uri.scheme = 'beanstalk'
+
+  if uri.scheme != 'beanstalk'
+    raise StandardError, "Bad URL: #{beanstalk_url}"
+  end
 
   "#{uri.host}:#{uri.port || 11300}"
 end
@@ -39,5 +46,18 @@ def jobs_hash
   result
 end
 
-puts "Checking tubes on #{beanstalk_url}, max allowed jobs: #{max_jobs}"
-puts jobs_hash
+def run
+  begin
+    result = jobs_hash.values.any? { |v| v.to_i > max_jobs }
+    case result
+    when true
+      puts '1'
+    else
+      puts '0'
+    end
+  rescue StandardError
+    puts '3'
+  end
+end
+
+run
