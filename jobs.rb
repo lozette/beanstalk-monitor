@@ -52,11 +52,9 @@ def jobs_hash
   critical = {}
 
   beanstalk.tubes.each do |tube|
-    jobs = tube.peek(:ready)
-    next if jobs.nil?
-
-    critical[tube.name] = jobs.length if jobs.length > critical_max_jobs
-    warning[tube.name]  = jobs.length if jobs.length > warning_max_jobs
+    jobs = tube.stats.current_jobs_ready
+    critical[tube.name] = jobs if jobs > critical_max_jobs
+    warning[tube.name]  = jobs if jobs > warning_max_jobs
   end
   result[:warning]  = warning
   result[:critical] = critical
