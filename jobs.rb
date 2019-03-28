@@ -1,12 +1,14 @@
 #!/usr/bin/env ruby
 #
-#  Usage: ruby jobs.rb <url> <max_jobs>
-#  e.g. ruby jobs.rb beanstalk://127.0.0.1/ 25
+#  Usage: ruby jobs.rb <url> <warning_max_jobs> <critical_max_jobs>
+#  e.g. ruby jobs.rb beanstalk://127.0.0.1/ 25 50
 
 require 'beaneater'
 require 'uri'
+require 'pry'
 
-MAX_JOBS = 25
+WARNING_MAX_JOBS = 25
+CRITICAL_MAX_JOBS = 50
 
 def beanstalk_url
   return ARGV[0] if ARGV.any?
@@ -14,12 +16,20 @@ def beanstalk_url
   'beanstalk://127.0.0.1/'
 end
 
-def max_jobs
-  if ARGV && ARGV[1].to_i > 0
+def warning_max_jobs
+  if ARGV.any? && ARGV[1].to_i > 0
     return ARGV[1].to_i
   end
 
-  MAX_JOBS
+  WARNING_MAX_JOBS
+end
+
+def critical_max_jobs
+  if ARGV.any? && ARGV[2].to_i > 0
+    return ARGV[2].to_i
+  end
+
+  CRITICAL_MAX_JOBS
 end
 
 def beanstalk_address
@@ -48,15 +58,15 @@ end
 
 def run
   begin
-    result = jobs_hash.values.any? { |v| v.to_i > max_jobs }
-    case result
-    when true
-      puts '1'
+    if jobs_hash.values.any? { |v| v.to_i > critical_max_jobs }
+      exit 2
+    elsif jobs_hash.values.any? { |v| v.to_i > warning_max_jobs }
+      exit 1
     else
-      puts '0'
+      exit 0
     end
   rescue StandardError
-    puts '3'
+    exit 3
   end
 end
 
